@@ -1,0 +1,8 @@
+.vscode/
+models/
+NER/NERspaCy/output/
+NER/NERspaCy/*.spacy
+test.wav
+Gemini.txt
+data/raw/
+data/augmented/
