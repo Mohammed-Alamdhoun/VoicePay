@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request, File, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from app.core.biometrics.challenge import generate_challenge
 import edge_tts
 import io
 
@@ -103,12 +104,44 @@ async def voice_to_text(request: Request, file: UploadFile = File(...)):
         response = client.listen.v1.media.transcribe_file(
             request=audio_data,
             model="nova-3",
-            smart_format=True,
-            language="ar-JO"
+            language="ar",
+            smart_format=True
         )
         text = response.results.channels[0].alternatives[0].transcript.strip()
             
         return {"status": "success", "text": text}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/generate-challenge")
+async def api_generate_challenge():
+    """Generates a random verification challenge."""
+    return generate_challenge()
+
+@router.post("/verify-voice")
+async def api_verify_voice(request: Request, user_pid: int, file: UploadFile = File(...)):
+    """Verifies user voice against stored voiceprint in DB."""
+    try:
+        audio_data = await file.read()
+        pipeline = request.app.state.pipeline
+        
+        # Get user from DB to fetch voiceprint
+        from app.db.models import PersonAccount
+        from app.db.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            user = db.query(PersonAccount).filter(PersonAccount.PID == user_pid).first()
+            if not user or not user.voiceprint:
+                return {"status": "error", "reason": "not_enrolled", "message": "User not enrolled for voice verification."}
+            
+            result = pipeline.speaker_verifier.verify(user_pid, audio_data, db_voiceprint=user.voiceprint)
+            return result
+        finally:
+            db.close()
+            
     except Exception as e:
         import traceback
         traceback.print_exc()

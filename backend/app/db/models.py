@@ -24,8 +24,11 @@ class PersonAccount(Base):
     phone_number = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=True)
     password = Column(String, nullable=True)
-    balance = Column(Float, default=0.0)
+    balance = Column(Float, default=1000.0)
     bank_name = Column(String, nullable=True) # New field for user's bank
+    voiceprint = Column(String, nullable=True) # JSON encoded vector
+    reset_code = Column(String, nullable=True)
+    reset_code_expires = Column(DateTime, nullable=True)
     bills = relationship('Bill', back_populates='owner', cascade='all, delete')
     sent_transactions = relationship('Transaction', foreign_keys='Transaction.sender_PID', back_populates='sender', cascade='all, delete')
     received_transactions = relationship('Transaction', foreign_keys='Transaction.recipient_PID', back_populates='recipient', cascade='all, delete')

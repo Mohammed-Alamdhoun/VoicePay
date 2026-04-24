@@ -11,6 +11,7 @@ from app.db.database import SessionLocal
 from app.db.models import PersonAccount, Bill, Transaction, AllowedRecipient
 from app.core.validators import IntentValidator, NERValidator
 from app.core.utils import normalize_arabic, find_closest_match, resolve_db_name, resolve_bill_name, extract_numeric_value
+from app.core.biometrics.verifier import SpeakerVerifier
 
 # Model paths relative to project root
 # Assuming the script is run from the project root or handled via absolute paths
@@ -59,6 +60,7 @@ class VoicePayPipeline:
         self.ner_model = NERModel(NER_MODEL_PATH)
         self.intent_validator = IntentValidator()
         self.ner_validator = NERValidator()
+        self.speaker_verifier = SpeakerVerifier()
         self.db = SessionLocal()
 
     def __del__(self):

@@ -1,13 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import bcrypt
+import json
+import os
+import random
+import re
+from datetime import datetime, timedelta
+from typing import List
 
 # Relative imports
 from app.db.database import SessionLocal
 from app.db.models import PersonAccount, AllowedRecipient, Bill
+from app.core.biometrics.challenge import generate_challenge
+from app.core.biometrics.verifier import SpeakerVerifier
 
 router = APIRouter(tags=["User Management"])
+speaker_verifier = SpeakerVerifier()
 
 # Dependency
 def get_db():
@@ -21,6 +30,13 @@ def get_db():
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+class RegisterRequest(BaseModel):
+    full_name: str
+    email: str
+    password: str
+    phone_number: str
+    bank_name: str
 
 class AddRecipientRequest(BaseModel):
     user_pid: int
@@ -40,7 +56,77 @@ class RemoveRecipientRequest(BaseModel):
     user_pid: int
     recipient_pid: int # We'll use the ID of the record
 
+class VerifyResetCodeRequest(BaseModel):
+    user_pid: int
+    code: str
+
 # --- Management Endpoints ---
+
+@router.post("/register")
+async def register(request: RegisterRequest, db: Session = Depends(get_db)):
+    # 1. Check if email already exists
+    existing_user = db.query(PersonAccount).filter(PersonAccount.email == request.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="البريد الإلكتروني مسجل بالفعل.")
+    
+    # 2. Generate unique reference number
+    ref_num = f"VP-{random.randint(100000, 999999)}"
+    while db.query(PersonAccount).filter(PersonAccount.reference_number == ref_num).first():
+        ref_num = f"VP-{random.randint(100000, 999999)}"
+    
+    # 3. Hash password
+    hashed_pw = bcrypt.hashpw(request.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    
+    # 4. Create user
+    new_user = PersonAccount(
+        full_name=request.full_name,
+        email=request.email,
+        password=hashed_pw,
+        phone_number=request.phone_number,
+        bank_name=request.bank_name,
+        reference_number=ref_num,
+        balance=1000.0
+    )
+    
+    try:
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        return {
+            "status": "success",
+            "message": "تم إنشاء الحساب بنجاح. يرجى إكمال تسجيل الصوت.",
+            "user_id": new_user.PID
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/enrollment-challenges")
+async def get_enrollment_challenges():
+    challenges = [generate_challenge() for _ in range(6)]
+    return challenges
+
+@router.post("/enroll-voice")
+async def enroll_voice(user_id: int, files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
+    if len(files) != 6:
+        raise HTTPException(status_code=400, detail="يجب تقديم 6 عينات صوتية بالضبط.")
+    
+    user = db.query(PersonAccount).filter(PersonAccount.PID == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="المستخدم غير موجود.")
+    
+    audio_samples = []
+    for file in files:
+        content = await file.read()
+        audio_samples.append(content)
+    
+    result = speaker_verifier.enroll(audio_samples)
+    if result["status"] == "success":
+        user.voiceprint = json.dumps(result["voiceprint"])
+        db.commit()
+        return {"status": "success", "message": "تم تسجيل بصمة الصوت بنجاح!"}
+    else:
+        raise HTTPException(status_code=400, detail=result["message"])
 
 @router.get("/user/{user_pid}")
 async def get_user_details(user_pid: int, db: Session = Depends(get_db)):
@@ -52,7 +138,9 @@ async def get_user_details(user_pid: int, db: Session = Depends(get_db)):
         "pid": user.PID,
         "full_name": user.full_name,
         "email": user.email,
-        "balance": user.balance
+        "balance": user.balance,
+        "bank_name": user.bank_name,
+        "reference_number": user.reference_number
     }
 
 @router.post("/login")
@@ -68,14 +156,25 @@ async def api_login(request: LoginRequest, db: Session = Depends(get_db)):
         if not bcrypt.checkpw(password_bytes, hash_bytes):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
         
-        return {
-            "status": "success",
-            "user": {
-                "pid": user.PID,
-                "full_name": user.full_name,
-                "email": user.email,
-                "balance": user.balance
+        # Check if voiceprint exists
+        if not user.voiceprint:
+            return {
+                "status": "needs_enrollment",
+                "message": "يرجى إكمال تسجيل بصمة الصوت أولاً.",
+                "user": {
+                    "pid": user.PID,
+                    "full_name": user.full_name,
+                    "email": user.email
+                }
             }
+
+        # New: Instead of success, return needs_challenge for 2FA
+        challenge = generate_challenge()
+        return {
+            "status": "needs_challenge",
+            "message": "يرجى تأكيد هويتك من خلال التحدث بالأرقام الظاهرة.",
+            "challenge": challenge,
+            "user_pid": user.PID
         }
     except Exception as e:
         import traceback
@@ -83,6 +182,205 @@ async def api_login(request: LoginRequest, db: Session = Depends(get_db)):
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/verify-login-challenge")
+async def verify_login_challenge(
+    request: Request,
+    user_pid: int,
+    challenge_code: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Verifies both voiceprint and the spoken digits for login."""
+    try:
+        audio_data = await file.read()
+        user = db.query(PersonAccount).filter(PersonAccount.PID == user_pid).first()
+        if not user or not user.voiceprint:
+            raise HTTPException(status_code=404, detail="User not found or not enrolled")
+
+        # 1. Verify Voiceprint (Speaker Verification)
+        # We use the pipeline from app.state
+        pipeline = request.app.state.pipeline
+        voice_result = pipeline.speaker_verifier.verify(user_pid, audio_data, db_voiceprint=user.voiceprint)
+        
+        if voice_result["status"] != "success":
+            return {
+                "status": "failed",
+                "reason": "voice_mismatch",
+                "message": "بصمة الصوت غير متطابقة. يرجى المحاولة مرة أخرى."
+            }
+
+        # 2. Verify Challenge Content (STT)
+        stt_client = request.app.state.stt_client
+        response = stt_client.listen.v1.media.transcribe_file(
+            request=audio_data,
+            model="nova-3",
+            language="ar",
+            smart_format=True
+        )
+        transcribed_text = response.results.channels[0].alternatives[0].transcript.strip()
+        print(f"DEBUG: Challenge Code: {challenge_code}")
+        print(f"DEBUG: Transcribed Text: '{transcribed_text}'")
+        
+        # Extract digits from transcribed text
+        digits_found = re.findall(r'\d', transcribed_text)
+        found_code = "".join(digits_found)
+        print(f"DEBUG: Found Digits: {found_code}")
+        
+        is_challenge_ok = (found_code == challenge_code)
+        
+        # Fallback: if smart_format didn't give digits, check for the Arabic words
+        if not is_challenge_ok:
+            matches = 0
+            from app.core.biometrics.challenge import DIGITS_AR
+            ALT_DIGITS_AR = {
+                "2": ["اثنان", "اثنين"],
+                "8": ["ثمانية", "تمانية"],
+            }
+            
+            for digit in challenge_code:
+                word = DIGITS_AR[digit]
+                found = False
+                if word in transcribed_text:
+                    found = True
+                elif digit in ALT_DIGITS_AR:
+                    for alt in ALT_DIGITS_AR[digit]:
+                        if alt in transcribed_text:
+                            found = True
+                            break
+                
+                if found:
+                    matches += 1
+            
+            if matches >= (len(challenge_code) - 1): 
+                is_challenge_ok = True
+
+        if not is_challenge_ok:
+            return {
+                "status": "failed",
+                "reason": "challenge_mismatch",
+                "message": f"الأرقام المنطوقة غير صحيحة. (سمعت: {transcribed_text})",
+                "transcribed": transcribed_text
+            }
+
+        # 3. If both OK, return success with user data
+        return {
+            "status": "success",
+            "message": "تم التحقق من الهوية بنجاح.",
+            "user": {
+                "pid": user.PID,
+                "full_name": user.full_name,
+                "email": user.email,
+                "balance": user.balance,
+                "bank_name": user.bank_name,
+                "reference_number": user.reference_number
+            }
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
+
+MAIL_USERNAME = os.getenv("MAIL_USERNAME")
+MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
+MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+MAIL_PORT = int(os.getenv("MAIL_PORT", 587))
+
+def send_actual_email(to_email: str, subject: str, body: str):
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = MAIL_USERNAME
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        server = smtplib.SMTP(MAIL_SERVER, MAIL_PORT)
+        server.starttls()
+        server.login(MAIL_USERNAME, MAIL_PASSWORD)
+        text = msg.as_string()
+        server.sendmail(MAIL_USERNAME, to_email, text)
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Error sending email: {e}")
+        return False
+
+@router.post("/send-reset-code")
+async def send_reset_code(user_pid: int, db: Session = Depends(get_db)):
+    user = db.query(PersonAccount).filter(PersonAccount.PID == user_pid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Generate 6-digit OTP
+    code = "".join([str(random.randint(0, 9)) for _ in range(6)])
+    user.reset_code = code
+    user.reset_code_expires = datetime.utcnow() + timedelta(minutes=15)
+    
+    db.commit()
+    
+    # Send actual email
+    subject = "VoicePay - Verification Code"
+    body = f"Hello {user.full_name},\n\nYour verification code is: {code}\n\nThis code will expire in 15 minutes."
+    
+    email_sent = send_actual_email(user.email, subject, body)
+    
+    if email_sent:
+        return {"status": "success", "message": "تم إرسال رمز التفعيل إلى بريدك الإلكتروني."}
+    else:
+        # Fallback to simulation if email fails so user can still test
+        print(f"\n[EMAIL FAILED - SIMULATION] To: {user.email}")
+        print(f"[EMAIL SIMULATION] Code: {code}\n")
+        return {"status": "warning", "message": "فشل إرسال البريد الإلكتروني. تم طباعة الرمز في سجلات الخادم."}
+
+@router.post("/verify-reset-code")
+async def verify_reset_code(request: VerifyResetCodeRequest, db: Session = Depends(get_db)):
+    user = db.query(PersonAccount).filter(PersonAccount.PID == request.user_pid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if not user.reset_code or user.reset_code != request.code:
+        return {"status": "error", "message": "رمز التفعيل غير صحيح."}
+    
+    if user.reset_code_expires < datetime.utcnow():
+        return {"status": "error", "message": "انتهت صلاحية رمز التفعيل."}
+    
+    # Clear voiceprint and reset code
+    user.voiceprint = None
+    user.reset_code = None
+    user.reset_code_expires = None
+    
+    db.commit()
+    
+    return {
+        "status": "needs_enrollment", 
+        "message": "تم التحقق بنجاح. يرجى إعادة تسجيل بصمة الصوت.",
+        "user_id": user.PID
+    }
+
+@router.post("/user/update-reference")
+async def update_reference_number(user_pid: int, db: Session = Depends(get_db)):
+    user = db.query(PersonAccount).filter(PersonAccount.PID == user_pid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Generate new unique reference number
+    ref_num = f"VP-{random.randint(100000, 999999)}"
+    while db.query(PersonAccount).filter(PersonAccount.reference_number == ref_num).first():
+        ref_num = f"VP-{random.randint(100000, 999999)}"
+    
+    user.reference_number = ref_num
+    db.commit()
+    return {"status": "success", "message": "تم تحديث رقم المرجع بنجاح.", "reference_number": ref_num}
 
 @router.get("/recipients/{user_pid}")
 async def get_recipients(user_pid: int, db: Session = Depends(get_db)):
@@ -168,7 +466,7 @@ async def update_recipient(request: UpdateRecipientRequest, db: Session = Depend
     contact.phone_number = request.phone_number
     
     db.commit()
-    return {"status": "success", "message": f"Recipient '{request.nickname}' updated successfully!"}
+    return {"status": "success", "message": f"تم تحديث المستلم '{request.nickname}' بنجاح!"}
 
 @router.post("/recipients/remove")
 async def remove_recipient(request: RemoveRecipientRequest, db: Session = Depends(get_db)):
@@ -176,14 +474,15 @@ async def remove_recipient(request: RemoveRecipientRequest, db: Session = Depend
         AllowedRecipient.user_pid == request.user_pid,
         AllowedRecipient.recipient_pid == request.recipient_pid
     ).first()
-    
+
     if not contact:
         # Try finding by ID if pid lookup fails
         contact = db.query(AllowedRecipient).filter(AllowedRecipient.id == request.recipient_pid).first()
 
     if not contact:
-        raise HTTPException(status_code=404, detail="Recipient record not found")
-        
+        raise HTTPException(status_code=404, detail="المستلم غير موجود")
+
     db.delete(contact)
     db.commit()
-    return {"status": "success", "message": "Recipient removed successfully!"}
+    return {"status": "success", "message": "تم حذف المستلم بنجاح!"}
+

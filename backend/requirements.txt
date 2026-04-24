@@ -9,3 +9,7 @@ deepgram-sdk
 edge-tts
 scikit-learn
 PyArabic
+resemblyzer
+numpy
+librosa
+pydubpython-dotenv
