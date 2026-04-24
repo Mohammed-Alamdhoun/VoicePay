@@ -12,4 +12,7 @@ PyArabic
 resemblyzer
 numpy
 librosa
-pydubpython-dotenv
+pydub
+python-dotenv
+bcrypt
+passlib

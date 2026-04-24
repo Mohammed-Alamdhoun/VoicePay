@@ -14,8 +14,17 @@ from app.core.utils import normalize_arabic, find_closest_match, resolve_db_name
 from app.core.biometrics.verifier import SpeakerVerifier
 
 # Model paths relative to project root
-# Assuming the script is run from the project root or handled via absolute paths
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+def find_project_root():
+    # Start from the current file's directory
+    curr = os.path.abspath(os.path.dirname(__file__))
+    # Go up until we find 'models' or 'NER' or reach root
+    while curr != os.path.dirname(curr):
+        if os.path.exists(os.path.join(curr, "models")) or os.path.exists(os.path.join(curr, "NER")):
+            return curr
+        curr = os.path.dirname(curr)
+    return "/"
+
+PROJECT_ROOT = find_project_root()
 INTENT_CLASSIFIER_PATH = os.path.join(PROJECT_ROOT, "models/voicepay_intent_pipeline.pkl")
 NER_MODEL_PATH = os.path.join(PROJECT_ROOT, "NER/NERspaCy/output/model-best")
 

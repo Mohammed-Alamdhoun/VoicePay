@@ -25,11 +25,61 @@ class ApiService {
         body: jsonEncode({'email': email, 'password': password}),
       ).timeout(timeoutDuration);
       
-      if (response.statusCode == 200) return jsonDecode(response.body);
-      throw Exception(jsonDecode(response.body)['detail'] ?? 'Failed to login');
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) return data;
+      throw Exception(data['detail'] ?? 'Failed to login');
     } catch (e) {
+      if (e is Exception && e.toString().contains('needs_enrollment')) {
+        rethrow;
+      }
       throw Exception('لا يمكن الاتصال بالخادم. تأكد من تشغيل الـ Backend. ($e)');
     }
+  }
+
+  Future<Map<String, dynamic>> register(String name, String email, String password, String phone, String bank) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/register'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'full_name': name,
+        'email': email,
+        'password': password,
+        'phone_number': phone,
+        'bank_name': bank,
+      }),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200) return data;
+    throw Exception(data['detail'] ?? 'Registration failed');
+  }
+
+  Future<List<dynamic>> getEnrollmentChallenges() async {
+    final response = await http.get(Uri.parse('$baseUrl/enrollment-challenges'));
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Failed to load challenges');
+  }
+
+  Future<Map<String, dynamic>> enrollVoice(int userPid, List<String> audioPaths) async {
+    var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/enroll-voice?user_id=$userPid'));
+    
+    for (int i = 0; i < audioPaths.length; i++) {
+      if (kIsWeb) {
+        final response = await http.get(Uri.parse(audioPaths[i]));
+        request.files.add(http.MultipartFile.fromBytes(
+          'files',
+          response.bodyBytes,
+          filename: 'sample_$i.m4a',
+        ));
+      } else {
+        request.files.add(await http.MultipartFile.fromPath('files', audioPaths[i]));
+      }
+    }
+    
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200) return data;
+    throw Exception(data['detail'] ?? 'Voice enrollment failed');
   }
 
   Future<Map<String, dynamic>> processCommand(String text, int userPid) async {
@@ -54,6 +104,24 @@ class ApiService {
     );
     if (response.statusCode == 200) return jsonDecode(response.body);
     throw Exception('Failed to confirm action');
+  }
+
+  Future<Map<String, dynamic>> sendResetCode(int userPid) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/send-reset-code?user_pid=$userPid'),
+    );
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Failed to send reset code');
+  }
+
+  Future<Map<String, dynamic>> verifyResetCode(int userPid, String code) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/verify-reset-code'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'user_pid': userPid, 'code': code}),
+    );
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Failed to verify reset code');
   }
 
   Future<Uint8List> textToSpeech(String text) async {
@@ -86,6 +154,41 @@ class ApiService {
       return data['text'] ?? '';
     }
     throw Exception('Failed to transcribe voice');
+  }
+
+  Future<Map<String, dynamic>> generateChallenge() async {
+    final response = await http.get(Uri.parse('$baseUrl/generate-challenge'));
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Failed to generate new challenge');
+  }
+
+  Future<Map<String, dynamic>> verifyLoginChallenge(int userPid, String challengeCode, String audioPath) async {
+    var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/verify-login-challenge?user_pid=$userPid&challenge_code=$challengeCode'));
+    
+    if (kIsWeb) {
+      final response = await http.get(Uri.parse(audioPath));
+      request.files.add(http.MultipartFile.fromBytes(
+        'file',
+        response.bodyBytes,
+        filename: 'challenge_record.m4a',
+      ));
+    } else {
+      request.files.add(await http.MultipartFile.fromPath('file', audioPath));
+    }
+    
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200) return data;
+    throw Exception(data['detail'] ?? 'Challenge verification failed');
+  }
+
+  Future<Map<String, dynamic>> updateReferenceNumber(int userPid) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/user/update-reference?user_pid=$userPid'),
+    );
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Failed to update reference number');
   }
 
   Future<List<dynamic>> getRecipients(int userPid) async {
