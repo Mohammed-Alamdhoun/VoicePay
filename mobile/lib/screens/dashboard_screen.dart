@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:convert';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'dart:io' show File;
 import '../services/api_service.dart';
 import '../services/ui_utils.dart';
+import '../core/app_colors.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Map<String, dynamic>? userData;
@@ -84,9 +84,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     super.didChangeDependencies();
     if (!_initialized && _user.isEmpty) {
       final args = ModalRoute.of(context)?.settings.arguments;
-      if (args is Map<String, dynamic>) {
+      if (args is Map) {
         setState(() {
-          _user = Map.from(args);
+          _user = Map<String, dynamic>.from(args);
           _fetchData();
         });
       }
@@ -359,27 +359,47 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     showDialog(context: context, builder: (context) => Directionality(
       textDirection: TextDirection.rtl,
       child: AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(existing == null ? 'إضافة مستلم' : 'تعديل مستلم', style: const TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        title: Text(existing == null ? 'إضافة مستلم' : 'تعديل مستلم', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textDark)),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: _nicknameController, decoration: const InputDecoration(labelText: 'الاسم الحركي', border: OutlineInputBorder())),
-          const SizedBox(height: 12),
-          TextField(controller: _phoneController, decoration: const InputDecoration(labelText: 'رقم الهاتف', border: OutlineInputBorder())),
-          const SizedBox(height: 12),
-          TextField(controller: _bankController, decoration: const InputDecoration(labelText: 'اسم البنك', border: OutlineInputBorder())),
-          const SizedBox(height: 12),
-          TextField(controller: _refController, decoration: const InputDecoration(labelText: 'رقم المرجع (Ref Number)', border: OutlineInputBorder())),
+          _buildDialogField(_nicknameController, 'الاسم الحركي', Icons.person_outline),
+          const SizedBox(height: 16),
+          _buildDialogField(_phoneController, 'رقم الهاتف', Icons.phone_android_outlined),
+          const SizedBox(height: 16),
+          _buildDialogField(_bankController, 'اسم البنك', Icons.account_balance_outlined),
+          const SizedBox(height: 16),
+          _buildDialogField(_refController, 'رقم المرجع (Ref Number)', Icons.tag),
         ])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('إلغاء', style: TextStyle(color: AppColors.textDark.withOpacity(0.7)))),
           ElevatedButton(
             onPressed: () => _saveRecipient(id: existing?['id']), 
-            style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-            child: const Text('حفظ'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+            child: const Text('حفظ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     ));
+  }
+
+  Widget _buildDialogField(TextEditingController controller, String label, IconData icon) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(color: AppColors.textDark),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: AppColors.textDark.withOpacity(0.6)),
+        floatingLabelStyle: const TextStyle(color: AppColors.primary),
+        prefixIcon: Icon(icon, color: AppColors.secondary),
+        filled: true,
+        fillColor: Colors.black.withOpacity(0.04),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
+      ),
+    );
   }
 
   void _updateRef() async {
@@ -426,7 +446,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return AnimatedBuilder(
       animation: _pulseController!,
       builder: (context, child) {
-        Color color = _isRecording ? Colors.red : Colors.green;
+        Color color = _isRecording ? Colors.redAccent : const Color(0xFF4ADE80);
         return Transform.scale(
           scale: 1.0 + (_pulseController!.value * scale),
           child: Container(
@@ -443,69 +463,143 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    if (_user.isEmpty) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_user.isEmpty) return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFFFB26B))));
     final List<Widget> pages = [_buildVoicePayTab(), _buildBillsTab(), _buildRecipientsTab()];
+    
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('VoicePay', style: TextStyle(fontWeight: FontWeight.bold)), actions: [IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.logout))], elevation: 2),
-        body: IndexedStack(index: _tabIndex, children: pages),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _tabIndex,
-          onDestinationSelected: (index) => setState(() => _tabIndex = index),
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.mic_none), selectedIcon: Icon(Icons.mic), label: 'دفع صوتي'),
-            NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'فواتير'),
-            NavigationDestination(icon: Icon(Icons.contacts_outlined), selectedIcon: Icon(Icons.contacts), label: 'جهات الاتصال'),
+        backgroundColor: const Color(0xFFF7F1EA),
+        extendBody: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('VoicePay', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 24)),
+          centerTitle: false,
+          actions: [
+            IconButton(
+              onPressed: () => Navigator.pop(context), 
+              icon: const Icon(Icons.logout_rounded, color: Colors.black)
+            )
           ],
         ),
+        body: Stack(
+          children: [
+            // 🔥 Background Glows
+            Positioned(top: -170, left: -120, child: _buildGlow(360, const Color(0xFFFFD6AE))),
+            Positioned(bottom: -220, right: -140, child: _buildGlow(420, const Color(0xFFD7EEF7))),
+            
+            Padding(
+              padding: const EdgeInsets.only(bottom: 80),
+              child: IndexedStack(index: _tabIndex, children: pages),
+            ),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomNav(),
+      ),
+    );
+  }
+
+  Widget _buildGlow(double size, Color color) {
+    return Container(
+      width: size, height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(0.7)),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      margin: const EdgeInsets.all(20),
+      height: 70,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, spreadRadius: 1),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildNavItem(Icons.mic_none_rounded, Icons.mic_rounded, 'دفع صوتي', 0),
+          _buildNavItem(Icons.receipt_long_outlined, Icons.receipt_long_rounded, 'فواتير', 1),
+          _buildNavItem(Icons.people_outline_rounded, Icons.people_rounded, 'جهات الاتصال', 2),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, IconData activeIcon, String label, int index) {
+    bool isSelected = _tabIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _tabIndex = index),
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(isSelected ? activeIcon : icon, color: isSelected ? const Color(0xFFFFB26B) : Colors.black54, size: 28),
+          const SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 10, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? const Color(0xFFFFB26B) : Colors.black54)),
+        ],
       ),
     );
   }
 
   Widget _buildVoicePayTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0), 
+      padding: const EdgeInsets.all(24.0), 
       child: Column(children: [
+        // 🔥 Glassmorphic Balance Card
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(28),
           decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(34),
             gradient: const LinearGradient(
-              colors: [Color(0xFF1E3C72), Color(0xFF2A5298)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
+              colors: [Color(0xFF2A140A), Color(0xFF5A463A)],
             ),
-            borderRadius: BorderRadius.circular(24),
             boxShadow: [
-              BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))
+              BoxShadow(color: const Color(0xFF2A140A).withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10)),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('الرصيد المتوفر', style: TextStyle(color: Colors.white70, fontSize: 14)),
-              const SizedBox(height: 8),
-              Text(
-                '${double.parse((_user['balance'] ?? 0).toString()).toStringAsFixed(2)} د.أ',
-                style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(_user['full_name'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 16)),
-                  const Icon(Icons.account_balance_wallet, color: Colors.white54),
+                  const Text('الرصيد المتوفر', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                  const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFFFFB26B), size: 20),
                 ],
               ),
+              const SizedBox(height: 12),
+              Text(
+                '${double.parse((_user['balance'] ?? 0).toString()).toStringAsFixed(2)} د.أ',
+                style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
+              ).animate().fade().slideY(begin: 0.1),
+              const SizedBox(height: 20),
+              const Divider(color: Colors.white24, height: 1),
+              const SizedBox(height: 16),
+              Text(_user['full_name'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500)),
+              Text(_user['reference_number'] ?? '', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
             ],
           ),
         ),
-        const SizedBox(height: 32),
-        const Text('بماذا يمكنني مساعدتك؟', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 24),
+        
+        const SizedBox(height: 40),
+        
+        const Text('بماذا يمكنني مساعدتك؟', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),
+        const SizedBox(height: 8),
+        const Text('تحدث لتنفيذ المعاملات بسرعة', style: TextStyle(fontSize: 14, color: Colors.black87)),
+        
+        const SizedBox(height: 40),
+        
         _buildVoiceButton(),
-        const SizedBox(height: 32),
+        
+        const SizedBox(height: 40),
+        
         if (_result.isNotEmpty) 
           _isCriticalError
             ? VoicePayUI.buildCriticalErrorBubble(
@@ -520,16 +614,48 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   onConfirm: () => _processConfirmation('نعم'),
                   onCancel: () => setState(() { _pendingTransaction = null; _result = 'تم إلغاء العملية.'; }),
                 ),
+                
         const SizedBox(height: 48),
-        ExpansionTile(
-          title: const Text('إدخال نصي يدوياً', style: TextStyle(fontSize: 14)),
-          children: [
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), child: Column(children: [
-              TextField(controller: _commandController, decoration: const InputDecoration(hintText: 'مثلاً: حول 50 دينار لزيد', border: OutlineInputBorder())),
-              const SizedBox(height: 8),
-              SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _isProcessing ? null : () { final text = _commandController.text; if (_pendingTransaction != null) _processConfirmation(text); else _processVoice(text); }, child: const Text('تنفيذ'))),
-            ])),
-          ],
+        
+        // Manual Input Section
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFFFB26B).withOpacity(0.2)),
+          ),
+          child: Column(
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.keyboard_outlined, color: Color(0xFFFFB26B), size: 18),
+                  SizedBox(width: 8),
+                  Text('إدخال نصي يدوياً', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _commandController, 
+                style: const TextStyle(color: Colors.black),
+                decoration: InputDecoration(
+                  hintText: 'مثلاً: حول 50 دينار لزيد',
+                  hintStyle: TextStyle(color: Colors.black.withOpacity(0.5)),
+                  filled: true,
+                  fillColor: Colors.grey.withOpacity(0.05),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.send_rounded, color: Color(0xFFFFB26B)),
+                    onPressed: _isProcessing ? null : () { 
+                      final text = _commandController.text; 
+                      if (_pendingTransaction != null) _processConfirmation(text); 
+                      else _processVoice(text); 
+                    },
+                  ),
+                )
+              ),
+            ],
+          ),
         ),
       ]),
     );
@@ -538,83 +664,136 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget _buildBillsTab() {
     if (_bills.isEmpty) return const Center(child: Text('لا توجد فواتير.'));
     return ListView.builder(
-      padding: const EdgeInsets.all(16), 
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8), 
       itemCount: _bills.length, 
       itemBuilder: (context, index) {
         final b = _bills[index]; 
         final isPaid = b['status'] == 'Paid';
         final color = _getBillColor(b['name']);
         
-        return Card(
-          elevation: 0,
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: Colors.grey.shade200),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.8),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFFFB26B).withOpacity(0.1)),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
           ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(12),
-            leading: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(_getBillIcon(b['name']), color: color),
               ),
-              child: Icon(_getBillIcon(b['name']), color: color),
-            ),
-            title: Text(b['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('${b['serves']}\nتاريخ الاستحقاق: ${b['due_date']}'),
-            isThreeLine: true,
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${double.parse(b['cost'].toString()).toStringAsFixed(2)} د.أ', 
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(b['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black)),
+                    Text(b['serves'], style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                    const SizedBox(height: 4),
+                    Text('تاريخ الاستحقاق: ${b['due_date']}', style: const TextStyle(fontSize: 11, color: Colors.black45)),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: (isPaid ? Colors.green : Colors.orange).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${double.parse(b['cost'].toString()).toStringAsFixed(2)}', 
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.black)
                   ),
-                  child: Text(
-                    isPaid ? 'مدفوعة' : 'غير مدفوعة', 
-                    style: TextStyle(color: isPaid ? Colors.green : Colors.orange, fontSize: 10, fontWeight: FontWeight.bold)
+                  const Text('د.أ', style: TextStyle(fontSize: 10, color: Colors.black54)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: (isPaid ? Colors.green : Colors.orange).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      isPaid ? 'مدفوعة' : 'مستحقة', 
+                      style: TextStyle(color: isPaid ? Colors.green : Colors.orange, fontSize: 10, fontWeight: FontWeight.bold)
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
-        );
+        ).animate().fade(delay: (index * 100).ms).slideX(begin: 0.1);
       }
     );
   }
 
   Widget _buildRecipientsTab() {
     return Column(children: [
-      Padding(padding: const EdgeInsets.all(16.0), child: ElevatedButton.icon(onPressed: () => _showRecipientDialog(), icon: const Icon(Icons.person_add), label: const Text('إضافة مستلم'), style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)))),
-      Expanded(child: ListView.builder(padding: const EdgeInsets.symmetric(horizontal: 16), itemCount: _recipients.length, itemBuilder: (context, index) {
-        final r = _recipients[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12), 
-          child: ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person_outline)), 
-            title: Text(r['nickname'], style: const TextStyle(fontWeight: FontWeight.bold)), 
-            subtitle: Text('${r['bank_name'] ?? 'بدون بنك'}\n${r['reference_number'] ?? ''}'), 
-            isThreeLine: true,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min, 
+      Padding(
+        padding: const EdgeInsets.all(24.0), 
+        child: SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton.icon(
+            onPressed: () => _showRecipientDialog(), 
+            icon: const Icon(Icons.person_add_rounded, color: Colors.white), 
+            label: const Text('إضافة مستلم جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+              elevation: 4,
+            ),
+          ),
+        ),
+      ),
+      Expanded(child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 24), 
+        itemCount: _recipients.length, 
+        itemBuilder: (context, index) {
+          final r = _recipients[index];
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+            ),
+            child: Row(
               children: [
-                IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _showRecipientDialog(existing: r)), 
-                IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _removeRecipient(r['id']))
-              ]
-            )
-          )
-        );
-      })),
+                CircleAvatar(
+                  radius: 25,
+                  backgroundColor: AppColors.secondary.withOpacity(0.15), 
+                  child: const Icon(Icons.person_rounded, color: AppColors.secondary, size: 30)
+                ), 
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(r['nickname'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark)), 
+                      Text(r['bank_name'] ?? 'بدون بنك', style: TextStyle(fontSize: 12, color: AppColors.textDark.withOpacity(0.6))), 
+                      Text(r['reference_number'] ?? '', style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold)), 
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_note_rounded, color: AppColors.secondary), 
+                  onPressed: () => _showRecipientDialog(existing: r)
+                ), 
+                IconButton(
+                  icon: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent), 
+                  onPressed: () => _removeRecipient(r['id'])
+                ),
+              ],
+            ),
+          ).animate().fade(delay: (index * 100).ms).slideY(begin: 0.1);
+        }
+      )),
     ]);
   }
 
@@ -631,27 +810,47 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               _buildPulseRing(1.5, 0.1),
             ],
             AnimatedBuilder(animation: _pulseController!, builder: (context, child) {
-              Color buttonColor = Colors.blue; IconData buttonIcon = Icons.mic;
-              if (_isRecording) { buttonColor = Colors.red; buttonIcon = Icons.stop; }
-              else if (_isProcessing) { buttonColor = Colors.grey; buttonIcon = Icons.hourglass_empty; }
-              else if (_isSpeaking) { buttonColor = Colors.green; buttonIcon = Icons.volume_up; }
-              else if (_pendingTransaction != null) { buttonColor = Colors.orange; buttonIcon = Icons.help_outline; }
-              return Container(width: 100, height: 100, decoration: BoxDecoration(shape: BoxShape.circle, color: buttonColor, boxShadow: [if (_isRecording || _isSpeaking) BoxShadow(color: buttonColor.withOpacity(0.4), blurRadius: 15 + _pulseController!.value * 20, spreadRadius: _pulseController!.value * 12) else const BoxShadow(color: Colors.black12, blurRadius: 6, spreadRadius: 2)]), child: _isProcessing ? const Padding(padding: EdgeInsets.all(25.0), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 4)) : Icon(buttonIcon, color: Colors.white, size: 50));
+              Color buttonColor = const Color(0xFFFFB26B); 
+              IconData buttonIcon = Icons.mic_rounded;
+              
+              if (_isRecording) { buttonColor = Colors.redAccent; buttonIcon = Icons.stop_rounded; }
+              else if (_isProcessing) { buttonColor = Colors.grey; buttonIcon = Icons.hourglass_empty_rounded; }
+              else if (_isSpeaking) { buttonColor = const Color(0xFF4ADE80); buttonIcon = Icons.volume_up_rounded; }
+              else if (_pendingTransaction != null) { buttonColor = const Color(0xFF8EDBFF); buttonIcon = Icons.help_outline_rounded; }
+              
+              return Container(
+                width: 100, height: 100, 
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle, 
+                  gradient: !_isRecording && !_isSpeaking && !_isProcessing ? const LinearGradient(colors: [Color(0xFFFFB26B), Color(0xFFFFD6AE)]) : null,
+                  color: (_isRecording || _isSpeaking || _isProcessing) ? buttonColor : null,
+                  boxShadow: [
+                    BoxShadow(
+                      color: buttonColor.withOpacity(0.35), 
+                      blurRadius: 30 + (_isRecording || _isSpeaking ? _pulseController!.value * 20 : 0), 
+                      spreadRadius: 2 + (_isRecording || _isSpeaking ? _pulseController!.value * 10 : 0)
+                    ) 
+                  ]
+                ), 
+                child: _isProcessing 
+                  ? const Padding(padding: EdgeInsets.all(28.0), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3)) 
+                  : Icon(buttonIcon, color: Colors.white, size: 50)
+              );
             }),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         _buildStatusText(),
       ]),
     );
   }
 
   Widget _buildStatusText() {
-    String text = 'اضغط للتحدث'; Color color = Colors.blue;
-    if (_isRecording) { text = 'أنا أسمعك الآن...'; color = Colors.red; }
-    else if (_isProcessing) { text = 'جاري معالجة طلبك...'; color = Colors.grey; }
-    else if (_isSpeaking) { text = 'جاري التحدث...'; color = Colors.green; }
-    else if (_pendingTransaction != null) { text = 'هل أنت متأكد؟ قل نعم أو لا'; color = Colors.orange; }
+    String text = 'اضغط للتحدث'; Color color = const Color(0xFFFFB26B);
+    if (_isRecording) { text = 'أنا أسمعك الآن...'; color = Colors.redAccent; }
+    else if (_isProcessing) { text = 'جاري المعالجة...'; color = Colors.grey; }
+    else if (_isSpeaking) { text = 'جاري التحدث...'; color = const Color(0xFF4ADE80); }
+    else if (_pendingTransaction != null) { text = 'هل أنت متأكد؟ قل نعم أو لا'; color = const Color(0xFF8EDBFF); }
     return Text(text, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16));
   }
 }
