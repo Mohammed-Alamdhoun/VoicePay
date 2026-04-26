@@ -213,12 +213,10 @@ async def verify_login_challenge(
         # 2. Verify Challenge Content (STT)
         stt_client = request.app.state.stt_client
         response = stt_client.listen.v1.media.transcribe_file(
-            request=audio_data,
-            options={
-                "model": "nova-2",
-                "language": "ar",
-                "smart_format": True,
-            }
+            request={'buffer': audio_data},
+            model="nova-2",
+            language="ar",
+            smart_format=True,
         )
         transcribed_text = response.results.channels[0].alternatives[0].transcript.strip()
         print(f"DEBUG: Challenge Code: {challenge_code}")

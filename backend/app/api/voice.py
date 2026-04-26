@@ -102,8 +102,8 @@ async def voice_to_text(request: Request, file: UploadFile = File(...)):
         client = request.app.state.stt_client
         
         response = client.listen.v1.media.transcribe_file(
-            request=audio_data,
-            model="nova-3",
+            request={'buffer': audio_data},
+            model="nova-2",
             language="ar",
             smart_format=True
         )
