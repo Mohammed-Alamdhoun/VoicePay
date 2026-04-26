@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../services/api_service.dart';
 import '../services/ui_utils.dart';
 import 'dashboard_screen.dart';
@@ -16,13 +17,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _apiService = ApiService();
   bool _isLoading = false;
 
-  // Error states for inline display
   String? _emailError;
   String? _passwordError;
   String? _generalError;
 
   void _handleLogin() async {
-    // Reset errors
     setState(() {
       _emailError = null;
       _passwordError = null;
@@ -30,19 +29,18 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
-    // Local validation
-    bool hasError = false;
     if (_emailController.text.isEmpty) {
-      _emailError = 'يرجى إدخال البريد الإلكتروني';
-      hasError = true;
+      setState(() {
+        _emailError = 'يرجى إدخال البريد الإلكتروني';
+        _isLoading = false;
+      });
+      return;
     }
     if (_passwordController.text.isEmpty) {
-      _passwordError = 'يرجى إدخال كلمة المرور';
-      hasError = true;
-    }
-
-    if (hasError) {
-      setState(() => _isLoading = false);
+      setState(() {
+        _passwordError = 'يرجى إدخال كلمة المرور';
+        _isLoading = false;
+      });
       return;
     }
 
@@ -81,10 +79,6 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } catch (e) {
       String errorMessage = e.toString().replaceAll('Exception: ', '');
-      if (errorMessage.contains('needs_enrollment')) {
-        return;
-      }
-      
       if (!mounted) return;
       
       setState(() {
@@ -106,106 +100,246 @@ class _LoginScreenState extends State<LoginScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: SingleChildScrollView(
-          child: Container(
-            height: MediaQuery.of(context).size.height,
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.account_balance_wallet, size: 100, color: Colors.blue),
-                const SizedBox(height: 16),
-                const Text('VoicePay', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 48),
-                
-                if (_generalError != null) ...[
-                  VoicePayUI.buildErrorContainer(_generalError!),
-                  const SizedBox(height: 16),
-                ],
-
-                // Email Field with error above
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: _emailError != null 
-                    ? Text(_emailError!, textAlign: TextAlign.left, style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold))
-                    : const SizedBox.shrink(),
+        backgroundColor: const Color(0xFFF7F1EA),
+        body: Stack(
+          children: [
+            // 🔥 Top orange glow
+            Positioned(
+              top: -170,
+              left: -120,
+              child: Container(
+                width: 360,
+                height: 360,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFFFD6AE).withOpacity(0.75),
                 ),
-                const SizedBox(height: 4),
-                Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: TextField(
-                    controller: _emailController,
-                    onChanged: (_) => setState(() => _emailError = null),
-                    decoration: InputDecoration(
-                      labelText: 'البريد الإلكتروني', 
-                      border: OutlineInputBorder(
-                        borderRadius: const BorderRadius.all(Radius.circular(12)),
-                        borderSide: BorderSide(color: _emailError != null ? Colors.red : Colors.grey),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: const BorderRadius.all(Radius.circular(12)),
-                        borderSide: BorderSide(color: _emailError != null ? Colors.red : Colors.grey.shade400),
-                      ),
-                      prefixIcon: Icon(Icons.email_outlined, color: _emailError != null ? Colors.red : null),
-                    ),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
+              ),
+            ),
+  
+            // 🔥 Bottom blue glow
+            Positioned(
+              bottom: -220,
+              right: -140,
+              child: Container(
+                width: 420,
+                height: 420,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFD7EEF7).withOpacity(0.75),
                 ),
-                
-                const SizedBox(height: 20),
-
-                // Password Field with error above
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: _passwordError != null 
-                    ? Text(_passwordError!, textAlign: TextAlign.left, style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold))
-                    : const SizedBox.shrink(),
-                ),
-                const SizedBox(height: 4),
-                Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: TextField(
-                    controller: _passwordController,
-                    onChanged: (_) => setState(() => _passwordError = null),
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      labelText: 'كلمة المرور', 
-                      border: OutlineInputBorder(
-                        borderRadius: const BorderRadius.all(Radius.circular(12)),
-                        borderSide: BorderSide(color: _passwordError != null ? Colors.red : Colors.grey),
+              ),
+            ),
+  
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 36),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(34),
+                      color: Colors.white.withOpacity(0.82),
+                      border: Border.all(
+                        color: const Color(0xFFFFB26B).withOpacity(0.18),
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: const BorderRadius.all(Radius.circular(12)),
-                        borderSide: BorderSide(color: _passwordError != null ? Colors.red : Colors.grey.shade400),
-                      ),
-                      prefixIcon: Icon(Icons.lock_outline, color: _passwordError != null ? Colors.red : null),
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(height: 32),
-                _isLoading 
-                  ? const CircularProgressIndicator()
-                  : Column(
-                      children: [
-                        ElevatedButton(
-                          onPressed: _handleLogin,
-                          style: ElevatedButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 55),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text('تسجيل الدخول', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        ),
-                        const SizedBox(height: 16),
-                        TextButton(
-                          onPressed: () => Navigator.pushNamed(context, '/register'),
-                          child: const Text('ليس لديك حساب؟ أنشئ حساباً جديداً', style: TextStyle(fontSize: 16)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFFB26B).withOpacity(0.14),
+                          blurRadius: 30,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 12),
                         ),
                       ],
                     ),
-              ],
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 🔥 Logo
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFB26B), Color(0xFF8EDBFF)],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFB26B).withOpacity(0.35),
+                                blurRadius: 35,
+                                spreadRadius: 3,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.graphic_eq_rounded,
+                            color: Colors.white,
+                            size: 44,
+                          ),
+                        )
+                            .animate()
+                            .fade(duration: 700.ms)
+                            .scale(begin: const Offset(0.85, 0.85)),
+  
+                        const SizedBox(height: 24),
+  
+                        const Text(
+                          'VoicePay',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2A140A),
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+  
+                        const SizedBox(height: 8),
+  
+                        Text(
+                          'مصادقة صوتية آمنة بالذكاء الاصطناعي',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: const Color(0xFF2A140A).withOpacity(0.65),
+                          ),
+                        ),
+  
+                        const SizedBox(height: 32),
+                        
+                        if (_generalError != null) ...[
+                          VoicePayUI.buildErrorContainer(_generalError!),
+                          const SizedBox(height: 16),
+                        ],
+  
+                        // Email Field
+                        Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: TextField(
+                            controller: _emailController,
+                            style: const TextStyle(color: Colors.black, fontSize: 15),
+                            cursorColor: Colors.black,
+                            onChanged: (_) => setState(() => _emailError = null),
+                            decoration: InputDecoration(
+                              hintText: 'البريد الإلكتروني',
+                              hintStyle: TextStyle(color: Colors.black.withOpacity(0.5)),
+                              errorText: _emailError,
+                              prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF8EDBFF)),
+                              filled: true,
+                              fillColor: Colors.white.withOpacity(0.65),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(22),
+                                borderSide: BorderSide(color: Colors.grey.withOpacity(0.08)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(22),
+                                borderSide: BorderSide(color: Colors.grey.withOpacity(0.08)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(22),
+                                borderSide: const BorderSide(color: Color(0xFFFFB26B), width: 2),
+                              ),
+                            ),
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 20),
+  
+                        // Password Field
+                        Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: TextField(
+                            controller: _passwordController,
+                            obscureText: true,
+                            style: const TextStyle(color: Colors.black, fontSize: 15),
+                            cursorColor: Colors.black,
+                            onChanged: (_) => setState(() => _passwordError = null),
+                            decoration: InputDecoration(
+                              hintText: 'كلمة المرور',
+                              hintStyle: TextStyle(color: Colors.black.withOpacity(0.5)),
+                              errorText: _passwordError,
+                              prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF8EDBFF)),
+                              filled: true,
+                              fillColor: Colors.white.withOpacity(0.65),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(22),
+                                borderSide: BorderSide(color: Colors.grey.withOpacity(0.08)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(22),
+                                borderSide: BorderSide(color: Colors.grey.withOpacity(0.08)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(22),
+                                borderSide: const BorderSide(color: Color(0xFFFFB26B), width: 2),
+                              ),
+                            ),
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 32),
+  
+                        if (_isLoading)
+                          const CircularProgressIndicator(color: Color(0xFFFFB26B))
+                        else ...[
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: ElevatedButton(
+                              onPressed: _handleLogin,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFFB26B),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(22),
+                                ),
+                                elevation: 8,
+                              ),
+                              child: const Text(
+                                'التحقق من الهوية',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
+                              ),
+                            ).animate(onPlay: (c) => c.repeat(reverse: true)).shimmer(duration: 3.seconds),
+                          ),
+                          
+                          const SizedBox(height: 16),
+                          
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pushNamed(context, '/register'),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: const Color(0xFF8EDBFF).withOpacity(0.7)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(22),
+                                ),
+                              ),
+                              child: const Text(
+                                'إنشاء هوية صوتية',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF2A140A)),
+                              ),
+                            ),
+                          ),
+                        ],
+  
+                        const SizedBox(height: 24),
+  
+                        Text(
+                          'مصادقة بنكية آمنة مدعومة بالذكاء الاصطناعي',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: const Color(0xFF2A140A).withOpacity(0.40),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

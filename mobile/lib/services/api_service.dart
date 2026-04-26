@@ -6,12 +6,7 @@ import 'dart:typed_data';
 class ApiService {
   // Automatically switch URL based on platform
   static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://localhost:5000/api/v1';
-    } else {
-      // 10.0.2.2 is the alias for 127.0.0.1 for Android Emulator
-      return 'http://10.0.2.2:5000/api/v1';
-    }
+    return 'https://modalmadhoun-voicepay-backend.hf.space/api/v1';
   }
 
   // Add a timeout to all requests to prevent infinite loading

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -32,9 +33,9 @@ class _LoginChallengeScreenState extends State<LoginChallengeScreen> {
     super.didChangeDependencies();
     if (!_isInitialized) {
       final args = ModalRoute.of(context)?.settings.arguments;
-      if (args is Map<String, dynamic>) {
+      if (args is Map) {
         _userId = args['user_pid'] ?? 0;
-        _challenge = args['challenge'] ?? {};
+        _challenge = Map<String, dynamic>.from(args['challenge'] ?? {});
       }
       _isInitialized = true;
     }
@@ -49,9 +50,11 @@ class _LoginChallengeScreenState extends State<LoginChallengeScreen> {
           path = '${directory.path}/login_challenge.wav';
         }
         
-        final config = kIsWeb 
-            ? const RecordConfig(encoder: AudioEncoder.opus) 
-            : const RecordConfig(encoder: AudioEncoder.wav);
+        const config = RecordConfig(
+          encoder: AudioEncoder.wav, 
+          sampleRate: 16000, 
+          numChannels: 1
+        );
 
         await _audioRecorder.start(config, path: path ?? '');
         
@@ -120,7 +123,6 @@ class _LoginChallengeScreenState extends State<LoginChallengeScreen> {
         context: context,
         barrierDismissible: true,
         builder: (context) {
-          String? dialogError;
           return StatefulBuilder(
             builder: (context, setDialogState) {
               void startCountdown() {
@@ -135,7 +137,6 @@ class _LoginChallengeScreenState extends State<LoginChallengeScreen> {
               });
             }
 
-            // Start timer if it's the first time
             if (resendTimer == null) {
               startCountdown();
             }
@@ -143,28 +144,26 @@ class _LoginChallengeScreenState extends State<LoginChallengeScreen> {
             return Directionality(
               textDirection: TextDirection.rtl,
               child: AlertDialog(
-                title: const Text('تحقق من البريد الإلكتروني'),
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                title: const Text('تحقق من البريد الإلكتروني', style: TextStyle(color: Color(0xFF2A140A), fontWeight: FontWeight.bold)),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('أدخل الرمز المكون من 6 أرقام المرسل إلى بريدك:'),
+                    const Text('أدخل الرمز المكون من 6 أرقام المرسل إلى بريدك:', style: TextStyle(color: Color(0xFF5A463A))),
                     const SizedBox(height: 16),
                     TextField(
                       controller: codeController,
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
                       maxLength: 6,
-                      style: const TextStyle(fontSize: 24, letterSpacing: 8),
+                      style: const TextStyle(fontSize: 24, letterSpacing: 8, color: Colors.black),
                       decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        errorText: dialogError,
-                        counterText: "", // Hide character counter
+                        filled: true,
+                        fillColor: const Color(0xFFF7F1EA),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        counterText: "",
                       ),
-                      onChanged: (_) {
-                        if (dialogError != null) {
-                          setDialogState(() => dialogError = null);
-                        }
-                      },
                     ),
                     const SizedBox(height: 12),
                     if (resendSeconds > 0)
@@ -177,48 +176,30 @@ class _LoginChallengeScreenState extends State<LoginChallengeScreen> {
                         onPressed: () async {
                           try {
                             await _apiService.sendResetCode(_userId);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('تم إعادة إرسال الرمز')),
-                              );
-                              startCountdown();
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              setDialogState(() => dialogError = 'فشل الإرسال: $e');
-                            }
-                          }
+                            startCountdown();
+                          } catch (e) {}
                         },
-                        child: const Text('إعادة إرسال الرمز'),
+                        child: const Text('إعادة إرسال الرمز', style: TextStyle(color: Color(0xFFFFB26B))),
                       ),
                   ],
                 ),
                 actions: [
-                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء', style: TextStyle(color: Color(0xFF8EDBFF)))),
                   ElevatedButton(
                     onPressed: () async {
                       try {
                         final verifyRes = await _apiService.verifyResetCode(_userId, codeController.text);
                         if (verifyRes['status'] == 'needs_enrollment') {
-                          if (context.mounted) {
-                            Navigator.pop(context); // Close dialog
-                            Navigator.pushReplacementNamed(
-                              context, 
-                              '/voice-enrollment', 
-                              arguments: {'user_id': _userId}
-                            );
-                          }
-                        } else {
-                          if (context.mounted) {
-                            setDialogState(() => dialogError = verifyRes['message'] ?? 'رمز غير صحيح');
-                          }
+                          Navigator.pop(context);
+                          Navigator.pushReplacementNamed(
+                            context, 
+                            '/voice-enrollment', 
+                            arguments: {'user_id': _userId}
+                          );
                         }
-                      } catch (e) {
-                        if (context.mounted) {
-                          setDialogState(() => dialogError = 'خطأ في التحقق: ${e.toString().replaceAll('Exception: ', '')}');
-                        }
-                      }
+                      } catch (e) {}
                     },
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFB26B), foregroundColor: Colors.white),
                     child: const Text('تحقق'),
                   ),
                 ],
@@ -228,7 +209,6 @@ class _LoginChallengeScreenState extends State<LoginChallengeScreen> {
         );
       },
     ).then((_) {
-        // Cancel timer when dialog is closed (dismissed or popped)
         resendTimer?.cancel();
       });
     } catch (e) {
@@ -266,8 +246,6 @@ class _LoginChallengeScreenState extends State<LoginChallengeScreen> {
               backgroundColor: Colors.red,
             ),
           );
-          // Allow retrying with same challenge or maybe get a new one?
-          // For now just allow retry.
         }
       }
     } catch (e) {
@@ -293,140 +271,186 @@ class _LoginChallengeScreenState extends State<LoginChallengeScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('التحقق من الهوية')),
-        body: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Icon(Icons.security, size: 80, color: Colors.blue),
-              const SizedBox(height: 24),
-              const Text(
-                'يرجى تأكيد هويتك من خلال قراءة الأرقام التالية بوضوح:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
+        backgroundColor: const Color(0xFFF7F1EA),
+        body: Stack(
+          children: [
+            // 🔥 Background Glows
+            _buildGlow(top: -170, left: -120, color: const Color(0xFFFFD6AE)),
+            _buildGlow(bottom: -220, right: -140, color: const Color(0xFFD7EEF7)),
+
+            // Back Button
+            Positioned(
+              top: 20, right: 20,
+              child: SafeArea(
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF2A140A)),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.5),
+                    padding: const EdgeInsets.all(12),
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              ),
+            ),
+
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Column(
                       children: [
-                        const SizedBox(width: 40), // Placeholder for balance
-                        Text(
-                          _challenge['code'] ?? '',
-                          style: const TextStyle(
-                            fontSize: 48, 
-                            letterSpacing: 8,
-                            fontWeight: FontWeight.bold, 
-                            color: Colors.blue
+                        _buildLogo(),
+                        const SizedBox(height: 24),
+                        const Text('التحقق من الهوية', style: TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Color(0xFF2A140A))),
+                        const SizedBox(height: 8),
+                        Text('يرجى تأكيد هويتك من خلال بصمتك الصوتية', style: TextStyle(fontSize: 15, color: const Color(0xFF2A140A).withOpacity(0.6))),
+                        const SizedBox(height: 32),
+
+                        _buildCard(
+                          child: Column(
+                            children: [
+                              const Text('تحدي الأمان الصوتي', style: TextStyle(fontSize: 18, color: Color(0xFF8EDBFF), fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 20),
+                              const Text('يرجى قراءة الأرقام التالية بوضوح:', style: TextStyle(color: Color(0xFF2A140A), fontSize: 14)),
+                              const SizedBox(height: 16),
+                              Wrap(
+                                alignment: WrapAlignment.center,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 12,
+                                runSpacing: 8,
+                                children: [
+                                  Text(
+                                    '${_challenge['code'] ?? ''}',
+                                    style: const TextStyle(fontSize: 36, letterSpacing: 4, fontWeight: FontWeight.bold, color: Color(0xFFFFB26B)),
+                                  ),
+                                  Text(
+                                    '(${_challenge['spoken'] ?? ''})',
+                                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2A140A)),
+                                  ),
+                                  IconButton(
+                                    onPressed: _isLoading ? null : _refreshChallenge,
+                                    icon: const Icon(Icons.refresh, color: Color(0xFF8EDBFF)),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                        IconButton(
-                          onPressed: _isLoading ? null : _refreshChallenge,
-                          icon: const Icon(Icons.refresh, color: Colors.blue),
-                          tooltip: 'تغيير الرمز',
+
+                        const SizedBox(height: 32),
+                        
+                        if (_isRecording)
+                          Text(
+                            'مدة التسجيل: ${(_recordMilliseconds / 1000.0).toStringAsFixed(1)} ثانية',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                          ),
+                        if (_recordedPath != null && !_isRecording)
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_circle, color: Colors.green),
+                              SizedBox(width: 8),
+                              Text('تم التسجيل بنجاح', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+
+                        const SizedBox(height: 24),
+
+                        // Recording Button
+                        GestureDetector(
+                          onTap: () => _isRecording ? _stopRecording() : _startRecording(),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: _isRecording ? Colors.redAccent : const Color(0xFFFFB26B),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(color: (_isRecording ? Colors.redAccent : const Color(0xFFFFB26B)).withOpacity(0.3), blurRadius: 20, spreadRadius: 5),
+                              ],
+                            ),
+                            child: Icon(_isRecording ? Icons.mic : Icons.mic_none, size: 60, color: Colors.white),
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 12),
+                        Text(_isRecording ? 'اضغط للإيقاف' : 'اضغط للتحدث', style: TextStyle(color: _isRecording ? Colors.redAccent : const Color(0xFFFFB26B), fontWeight: FontWeight.bold)),
+
+                        const SizedBox(height: 48),
+
+                        SizedBox(
+                          width: double.infinity,
+                          height: 58,
+                          child: _isLoading 
+                            ? const Center(child: CircularProgressIndicator(color: Color(0xFFFFB26B)))
+                            : ElevatedButton(
+                                onPressed: _recordedPath != null && !_isRecording ? _verifyChallenge : null,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFFB26B),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                                  elevation: 8,
+                                ),
+                                child: const Text('تأكيد الدخول', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              ),
+                        ),
+
+                        const SizedBox(height: 16),
+                        TextButton(
+                          onPressed: _isLoading ? null : _handleEmailReset,
+                          child: const Text(
+                            'أعد ضبط بصمة الصوت عبر البريد',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Color(0xFF5A463A), fontWeight: FontWeight.w600),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _challenge['spoken'] ?? '',
-                      style: TextStyle(fontSize: 18, color: Colors.blue.shade700),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              if (_isRecording)
-                Text(
-                  'مدة التسجيل: ${(_recordMilliseconds / 1000.0).toStringAsFixed(1)} ثانية',
-                  style: const TextStyle(
-                    fontSize: 18, 
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red
-                  ),
-                ),
-              if (_recordedPath != null && !_isRecording)
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.green),
-                    SizedBox(width: 8),
-                    Text('تم التسجيل بنجاح', style: TextStyle(color: Colors.green)),
-                  ],
-                ),
-              const SizedBox(height: 20),
-              GestureDetector(
-                onLongPressStart: (_) => _startRecording(),
-                onLongPressEnd: (_) => _stopRecording(),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: _isRecording ? Colors.red : Colors.blue,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: (_isRecording ? Colors.red : Colors.blue).withOpacity(0.3),
-                        blurRadius: 15,
-                        spreadRadius: 5,
-                      )
-                    ],
-                  ),
-                  child: Icon(
-                    _isRecording ? Icons.mic : Icons.mic_none,
-                    size: 60,
-                    color: Colors.white,
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                _isRecording ? 'اترك الزر عند الانتهاء' : 'اضغط مطولاً للتحدث',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: _isRecording ? Colors.red : Colors.blue
-                ),
-              ),
-              const SizedBox(height: 48),
-              SizedBox(
-                width: double.infinity,
-                child: _isLoading 
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: _recordedPath != null && !_isRecording ? _verifyChallenge : null,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 2,
-                      ),
-                      child: const Text('تأكيد الدخول', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    ),
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: _isLoading ? null : _handleEmailReset,
-                child: const Text(
-                  'تواجه مشكلة في التحقق الصوتي؟ أعد ضبط بصمة الصوت عبر البريد',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.blueGrey),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildGlow({double? top, double? bottom, double? left, double? right, required Color color}) {
+    return Positioned(
+      top: top, bottom: bottom, left: left, right: right,
+      child: Container(
+        width: 400, height: 400,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(0.75)),
+      ),
+    );
+  }
+
+  Widget _buildLogo() {
+    return Container(
+      width: 100, height: 100,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(colors: [Color(0xFFFFB26B), Color(0xFF8EDBFF)]),
+        boxShadow: [BoxShadow(color: const Color(0xFFFFB26B).withOpacity(0.35), blurRadius: 35, spreadRadius: 3)],
+      ),
+      child: const Icon(Icons.security, color: Colors.white, size: 48),
+    );
+  }
+
+  Widget _buildCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        color: Colors.white.withOpacity(0.82),
+        border: Border.all(color: const Color(0xFFFFB26B).withOpacity(0.1)),
+        boxShadow: [BoxShadow(color: const Color(0xFFFFB26B).withOpacity(0.1), blurRadius: 30, spreadRadius: 1)],
+      ),
+      child: child,
     );
   }
 }

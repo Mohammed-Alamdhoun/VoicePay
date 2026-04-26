@@ -8,7 +8,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../services/api_service.dart';
 import '../services/ui_utils.dart';
-import '../core/app_colors.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Map<String, dynamic>? userData;
@@ -361,7 +360,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       child: AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        title: Text(existing == null ? 'إضافة مستلم' : 'تعديل مستلم', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textDark)),
+        title: Text(existing == null ? 'إضافة مستلم' : 'تعديل مستلم', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2A140A))),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           _buildDialogField(_nicknameController, 'الاسم الحركي', Icons.person_outline),
           const SizedBox(height: 16),
@@ -372,11 +371,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           _buildDialogField(_refController, 'رقم المرجع (Ref Number)', Icons.tag),
         ])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('إلغاء', style: TextStyle(color: AppColors.textDark.withOpacity(0.7)))),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء', style: TextStyle(color: Color(0xFF5A463A)))),
           ElevatedButton(
             onPressed: () => _saveRecipient(id: existing?['id']), 
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: const Color(0xFFFFB26B),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             ),
             child: const Text('حفظ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -389,14 +388,14 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget _buildDialogField(TextEditingController controller, String label, IconData icon) {
     return TextField(
       controller: controller,
-      style: const TextStyle(color: AppColors.textDark),
+      style: const TextStyle(color: Colors.black),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: AppColors.textDark.withOpacity(0.6)),
-        floatingLabelStyle: const TextStyle(color: AppColors.primary),
-        prefixIcon: Icon(icon, color: AppColors.secondary),
+        labelStyle: const TextStyle(color: Colors.black54),
+        floatingLabelStyle: const TextStyle(color: Color(0xFFFFB26B)),
+        prefixIcon: Icon(icon, color: const Color(0xFF8EDBFF)),
         filled: true,
-        fillColor: Colors.black.withOpacity(0.04),
+        fillColor: Colors.grey.withOpacity(0.05),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
       ),
     );
@@ -743,7 +742,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             icon: const Icon(Icons.person_add_rounded, color: Colors.white), 
             label: const Text('إضافة مستلم جديد', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: const Color(0xFFFFB26B),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
               elevation: 4,
             ),
@@ -761,28 +760,28 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.8),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+              border: Border.all(color: const Color(0xFFFFB26B).withOpacity(0.1)),
             ),
             child: Row(
               children: [
                 CircleAvatar(
                   radius: 25,
-                  backgroundColor: AppColors.secondary.withOpacity(0.15), 
-                  child: const Icon(Icons.person_rounded, color: AppColors.secondary, size: 30)
+                  backgroundColor: const Color(0xFF8EDBFF).withOpacity(0.15), 
+                  child: const Icon(Icons.person_rounded, color: Color(0xFF8EDBFF), size: 30)
                 ), 
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(r['nickname'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textDark)), 
-                      Text(r['bank_name'] ?? 'بدون بنك', style: TextStyle(fontSize: 12, color: AppColors.textDark.withOpacity(0.6))), 
-                      Text(r['reference_number'] ?? '', style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold)), 
+                      Text(r['nickname'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black)), 
+                      Text(r['bank_name'] ?? 'بدون بنك', style: const TextStyle(fontSize: 12, color: Colors.black54)), 
+                      Text(r['reference_number'] ?? '', style: const TextStyle(fontSize: 11, color: Color(0xFFFFB26B), fontWeight: FontWeight.bold)), 
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.edit_note_rounded, color: AppColors.secondary), 
+                  icon: const Icon(Icons.edit_note_rounded, color: Color(0xFF8EDBFF)), 
                   onPressed: () => _showRecipientDialog(existing: r)
                 ), 
                 IconButton(

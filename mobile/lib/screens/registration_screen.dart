@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../services/api_service.dart';
 
 class RegistrationScreen extends StatefulWidget {
@@ -33,9 +34,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Registration successful')),
-        );
         Navigator.pushReplacementNamed(
           context, 
           '/voice-enrollment', 
@@ -45,7 +43,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(content: Text('خطأ: ${e.toString().replaceAll('Exception: ', '')}')),
         );
       }
     } finally {
@@ -55,93 +53,173 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('انضم إلى VoicePay')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'إنشاء حساب جديد',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 30),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'الاسم الكامل',
-                  prefixIcon: Icon(Icons.person),
-                  border: OutlineInputBorder(),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF7F1EA),
+        body: Stack(
+          children: [
+            // 🔥 Top orange glow
+            Positioned(
+              top: -170,
+              left: -120,
+              child: Container(
+                width: 360,
+                height: 360,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFFFD6AE).withOpacity(0.75),
                 ),
-                validator: (v) => v!.isEmpty ? 'يرجى إدخال الاسم' : null,
               ),
-              const SizedBox(height: 15),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'البريد الإلكتروني',
-                  prefixIcon: Icon(Icons.email),
-                  border: OutlineInputBorder(),
+            ),
+  
+            // 🔥 Bottom blue glow
+            Positioned(
+              bottom: -220,
+              right: -140,
+              child: Container(
+                width: 420,
+                height: 420,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFD7EEF7).withOpacity(0.75),
                 ),
-                keyboardType: TextInputType.emailAddress,
-                validator: (v) => v!.isEmpty || !v.contains('@') ? 'يرجى إدخال بريد صحيح' : null,
               ),
-              const SizedBox(height: 15),
-              TextFormField(
-                controller: _passwordController,
-                decoration: const InputDecoration(
-                  labelText: 'كلمة المرور',
-                  prefixIcon: Icon(Icons.lock),
-                  border: OutlineInputBorder(),
+            ),
+  
+            // Back Button
+            Positioned(
+              top: 20,
+              right: 20,
+              child: SafeArea(
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF2A140A)),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.5),
+                    padding: const EdgeInsets.all(12),
+                  ),
                 ),
-                obscureText: true,
-                validator: (v) => v!.length < 6 ? 'يجب أن تكون 6 خانات على الأقل' : null,
               ),
-              const SizedBox(height: 15),
-              TextFormField(
-                controller: _phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'رقم الهاتف',
-                  prefixIcon: Icon(Icons.phone),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.phone,
-                validator: (v) => v!.isEmpty ? 'يرجى إدخال رقم الهاتف' : null,
-              ),
-              const SizedBox(height: 15),
-              TextFormField(
-                controller: _bankController,
-                decoration: const InputDecoration(
-                  labelText: 'اسم البنك',
-                  prefixIcon: Icon(Icons.account_balance),
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) => v!.isEmpty ? 'يرجى إدخال اسم البنك' : null,
-              ),
-              const SizedBox(height: 30),
-              _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: _register,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: const Text('التالي: تسجيل الصوت', style: TextStyle(fontSize: 18)),
+            ),
+  
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 36),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(34),
+                      color: Colors.white.withOpacity(0.82),
+                      border: Border.all(color: const Color(0xFFFFB26B).withOpacity(0.18)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFFB26B).withOpacity(0.14),
+                          blurRadius: 30,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 12),
+                        ),
+                      ],
                     ),
-              const SizedBox(height: 15),
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('لديك حساب بالفعل؟ سجل دخولك'),
-              ),
-            ],
-          ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'انضم إلى VoicePay',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2A140A),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'قم بإنشاء حساب صوتي آمن',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: const Color(0xFF2A140A).withOpacity(0.6),
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          
+                          _buildField(_nameController, 'الاسم الكامل', Icons.person),
+                          const SizedBox(height: 16),
+                          _buildField(_emailController, 'البريد الإلكتروني', Icons.email, keyboardType: TextInputType.emailAddress),
+                          const SizedBox(height: 16),
+                          _buildField(_passwordController, 'كلمة المرور', Icons.lock, obscure: true),
+                          const SizedBox(height: 16),
+                          _buildField(_phoneController, 'رقم الهاتف', Icons.phone, keyboardType: TextInputType.phone),
+                          const SizedBox(height: 16),
+                          _buildField(_bankController, 'اسم البنك', Icons.account_balance),
+                          
+                          const SizedBox(height: 32),
+                          
+                          if (_isLoading)
+                            const CircularProgressIndicator(color: Color(0xFFFFB26B))
+                          else
+                            SizedBox(
+                              width: double.infinity,
+                              height: 58,
+                              child: ElevatedButton(
+                                onPressed: _register,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFFB26B),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                                  elevation: 8,
+                                ),
+                                child: const Text(
+                                  'المتابعة لإعداد الصوت',
+                                  style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, fontSize: 16),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ).animate().fade(duration: 500.ms).slideY(begin: 0.1),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildField(TextEditingController controller, String label, IconData icon, {bool obscure = false, TextInputType? keyboardType}) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscure,
+      keyboardType: keyboardType,
+      textAlign: TextAlign.right,
+      style: const TextStyle(color: Colors.black, fontSize: 15),
+      cursorColor: Colors.black,
+      decoration: InputDecoration(
+        hintText: label,
+        hintStyle: TextStyle(color: Colors.black.withOpacity(0.5)),
+        prefixIcon: Icon(icon, color: const Color(0xFF8EDBFF)),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.65),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide(color: Colors.grey.withOpacity(0.08)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide(color: Colors.grey.withOpacity(0.08)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: const BorderSide(color: Color(0xFFFFB26B), width: 2),
+        ),
+      ),
+      validator: (v) => v!.isEmpty ? 'يرجى ملء الحقل' : null,
     );
   }
 }

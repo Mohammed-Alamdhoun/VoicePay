@@ -23,13 +23,13 @@ class SpeakerVerifier:
     def load_user(self, user_id, db_voiceprint=None):
         if db_voiceprint:
             voiceprint = np.array(json.loads(db_voiceprint), dtype=np.float32)
-            return voiceprint, 0.75
+            return voiceprint, 0.6
         user_id_str = str(user_id)
         if user_id_str not in self.db_cache:
             raise ValueError(f"User '{user_id}' not enrolled for voice verification.")
         item = self.db_cache[user_id_str]
         voiceprint = np.array(item if isinstance(item, list) else item["voiceprint"], dtype=np.float32)
-        threshold = float(item.get("threshold", 0.75)) if isinstance(item, dict) else 0.75
+        threshold = float(item.get("threshold", 0.6)) if isinstance(item, dict) else 0.6
         return voiceprint, threshold
 
     def _load_audio(self, audio_bytes):

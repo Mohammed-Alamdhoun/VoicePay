@@ -92,17 +92,6 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-
-        # 5. Add default bills
-        default_bills = [
-            Bill(bills_name='الكهرباء', bills_cost=round(random.uniform(20.0, 60.0), 2), serves='شركة الكهرباء الوطنية', due_date=(datetime.now() + timedelta(days=20)).strftime('%Y-%m-%d'), account_PID=new_user.PID, paid_status='Unpaid'),
-            Bill(bills_name='المياه', bills_cost=round(random.uniform(10.0, 30.0), 2), serves='مياهنا', due_date=(datetime.now() + timedelta(days=25)).strftime('%Y-%m-%d'), account_PID=new_user.PID, paid_status='Unpaid'),
-            Bill(bills_name='إنترنت', bills_cost=round(random.uniform(25.0, 45.0), 2), serves='زين', due_date=(datetime.now() + timedelta(days=15)).strftime('%Y-%m-%d'), account_PID=new_user.PID, paid_status='Unpaid'),
-            Bill(bills_name='هاتف', bills_cost=round(random.uniform(5.0, 20.0), 2), serves='أورانج', due_date=(datetime.now() + timedelta(days=10)).strftime('%Y-%m-%d'), account_PID=new_user.PID, paid_status='Unpaid'),
-        ]
-        db.add_all(default_bills)
-        db.commit()
-
         return {
             "status": "success",
             "message": "تم إنشاء الحساب بنجاح. يرجى إكمال تسجيل الصوت.",
