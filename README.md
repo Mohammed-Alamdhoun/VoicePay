@@ -148,5 +148,6 @@ The app calls the hosted backend by default. To use your local server, change `b
 
 ## Team
 
-Built by Mohammed Al-Madhoun, Layan and Shatha.
-<!-- Add Layan's and Shatha's full names and GitHub or LinkedIn links here. -->
+- [Mohammed Al-Madhoun](https://github.com/Mohammed-Alamdhoun)
+- Layan Khaddash
+- [Shatha Al-Ghrair](https://github.com/ShathaAlghrair)
