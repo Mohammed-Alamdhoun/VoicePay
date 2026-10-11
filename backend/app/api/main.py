@@ -12,7 +12,7 @@ from app.api.voice import router as voice_router
 from app.api.management import router as management_router
 from deepgram import DeepgramClient
 
-DEEPGRAM_API_KEY = "79993c1ce891ea233887e95690d551bb5334fe7f"
+DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
 
 app = FastAPI(title="VoicePay API")
 
